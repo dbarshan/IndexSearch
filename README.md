@@ -1,93 +1,113 @@
 # IndexSearch
 
-IndexSearch is a Spring Boot based application that implements an **Inverted Index** for efficient document searching. It supports creating, updating, deleting, and searching documents via a RESTful API.
+IndexSearch is a Spring Boot based application that implements an **Inverted Index** for efficient document searching. It includes a REST server and a CLI client for creating, updating, deleting, and searching documents.
 
 ## Features
 
 - **Inverted Indexing**: Fast full-text search capabilities.
 - **REST API**: Simple interface for document management.
 - **Persistence**: Persists data to the local disk (`data/` directory) to survive restarts.
-- **Spring Boot 3**: Built on the latest modern Java stack.
+- **Spring Boot**: Java 17, Spring Boot 2.7.x, JLine-based CLI.
 
 ## Prerequisites
 
 - **Java 17** or higher
 - **Maven** 3.6+
 
-## Getting Started
+## Build
 
-### Installation
-
-1. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   cd IndexSearch
-   ```
-
-2. Build the application:
-   ```bash
-   mvn clean install
-   ```
-
-### Running the Application
-
-Run the application using the Spring Boot Maven plugin:
 ```bash
-mvn spring-boot:run
+mvn clean package
 ```
 
-Or run the built JAR file directly:
+This produces:
+- Server JAR: `target/indexsearch-server-0.0.1-SNAPSHOT.jar`
+- Client JAR: `target/indexsearch-client-0.0.1-SNAPSHOT.jar`
+
+## Run the Server
+
+The server starts on `http://localhost:8080` by default.
+
 ```bash
-java -jar target/indexsearch-0.0.1-SNAPSHOT.jar
+./server.sh
 ```
 
-The application will start on `http://localhost:8080`.
-
-## API Usage
-
-The application provides a REST API at `/api`.
-
-### 1. Add a Document
-**endpoint**: `POST /api/documents`
+Or run the JAR directly:
 
 ```bash
-curl -X POST "http://localhost:8080/api/documents?keyField=content" \
-     -H "Content-Type: application/json" \
-     -d '{"id": "doc1", "title": "My First Doc", "content": "hello world search"}'
+java -jar target/indexsearch-server-0.0.1-SNAPSHOT.jar --spring.profiles.active=server
 ```
 
-### 2. Search Documents
-**endpoint**: `GET /api/search`
+Server data is stored under `data/`, `metadata/`, and `index/` in the project root.
+
+## Run the Client (CLI)
+
+The CLI talks to the server at `http://localhost:8080` by default. Override with
+`-Dindexsearch.server.url=...` if needed.
 
 ```bash
-curl -s "http://localhost:8080/api/search?query=hello" | jq .
+./client.sh
 ```
 
-### 3. Update a Document
-**endpoint**: `PUT /api/documents/{id}`
+Or run the JAR directly:
 
 ```bash
-curl -X PUT "http://localhost:8080/api/documents/doc1?keyField=content" \
-     -H "Content-Type: application/json" \
-     -d '{"title": "Updated Title", "content": "hello universe search"}'
+java -Dspring.profiles.active=client \
+  -Dindexsearch.server.url=http://localhost:8080 \
+  -jar target/indexsearch-client-0.0.1-SNAPSHOT.jar
 ```
 
-### 4. Delete a Document
-**endpoint**: `DELETE /api/documents/{id}`
-
-```bash
-curl -X DELETE "http://localhost:8080/api/documents/doc1"
+CLI commands:
+```
+create-collection <mapping-json|@file>
+list-collections
+delete-collection <collection>
+add-doc <collection> <document-json|@file>
+update-doc <collection> <docId> <document-json|@file>
+get-doc <collection> <docId>
+delete-doc <collection> <docId>
+search <collection> <query>
+sql <sql-query>
+rebuild-index <collection>
 ```
 
-## Testing & Verification
+## APIs
 
-The project includes shell scripts to valid functionality:
+Base URL: `http://localhost:8080/api`
 
-- **`test_endpoints.sh`**: Runs a sequence of API calls to test CRUD operations and search.
-- **`verify_persistence.sh`**: Tests that documents are correctly saved to disk and can be retrieved after an application restart.
+### Collections
+- `GET /collections` - list collections
+- `POST /collections` - create collection from a mapping JSON
+- `DELETE /collections/{name}` - delete a collection
 
-Run them using:
+Example:
 ```bash
-./test_endpoints.sh
-./verify_persistence.sh
+curl -X POST "http://localhost:8080/api/collections" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"books","keys":[{"field":"title"},{"field":"content"}]}'
+```
+
+### Documents
+- `POST /collections/{collection}/documents` - create document
+- `PUT /collections/{collection}/documents/{id}` - update document
+- `GET /collections/{collection}/documents/{id}` - fetch document
+- `DELETE /collections/{collection}/documents/{id}` - delete document
+
+Example:
+```bash
+curl -X POST "http://localhost:8080/api/collections/books/documents" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"My First Doc","content":"hello world search"}'
+```
+
+### Search
+- `POST /collections/search?collection=NAME&query=TEXT` - simple search
+- `POST /query` - SQL-like query; body `{"query":"..." }`
+
+Examples:
+```bash
+curl -X POST "http://localhost:8080/api/collections/search?collection=books&query=hello"
+curl -X POST "http://localhost:8080/api/query" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"SELECT * FROM books WHERE content = \"hello\""}'
 ```
