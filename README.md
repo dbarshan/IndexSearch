@@ -1,13 +1,13 @@
 # IndexSearch
 
-IndexSearch is a Spring Boot based application that implements an **Inverted Index** for efficient document searching. It includes a REST server and a CLI client for creating, updating, deleting, and searching documents.
+IndexSearch is a Spring Boot based application that implements an **Inverted Index** for efficient document searching. It includes a REST server and both CLI and GUI clients for creating, updating, deleting, and searching documents.
 
 ## Features
 
 - **Inverted Indexing**: Fast full-text search capabilities.
 - **REST API**: Simple interface for document management.
 - **Persistence**: Persists data to the local disk (`data/` directory) to survive restarts.
-- **Spring Boot**: Java 17, Spring Boot 2.7.x, JLine-based CLI.
+- **Spring Boot**: Java 17, Spring Boot 2.7.x, JLine-based CLI, JavaFX GUI.
 
 ## Prerequisites
 
@@ -16,7 +16,7 @@ IndexSearch is a Spring Boot based application that implements an **Inverted Ind
 
 ## Build
 
-```bash
+   ```bash
 mvn clean package
 ```
 
@@ -53,6 +53,7 @@ Or run the JAR directly:
 
 ```bash
 java -Dspring.profiles.active=client \
+  -Dapplication.client.mode=cli \
   -Dindexsearch.server.url=http://localhost:8080 \
   -jar target/indexsearch-client-0.0.1-SNAPSHOT.jar
 ```
@@ -71,6 +72,20 @@ sql <sql-query>
 rebuild-index <collection>
 ```
 
+## Run the Client (GUI)
+
+The GUI uses JavaFX 21 and reads the same server URL setting. It does not
+connect automatically; click **connect** to load collections.
+
+```bash
+java -Dspring.profiles.active=client \
+  -Dapplication.client.mode=gui \
+  -Dindexsearch.server.url=http://localhost:8080 \
+  -jar target/indexsearch-client-0.0.1-SNAPSHOT.jar
+```
+
+![IndexSearch GUI](docs/images/gui.png)
+
 ## APIs
 
 Base URL: `http://localhost:8080/api`
@@ -83,7 +98,7 @@ Base URL: `http://localhost:8080/api`
 Example:
 ```bash
 curl -X POST "http://localhost:8080/api/collections" \
-  -H "Content-Type: application/json" \
+     -H "Content-Type: application/json" \
   -d '{"name":"books","keys":[{"field":"title"},{"field":"content"}]}'
 ```
 
@@ -103,6 +118,10 @@ curl -X POST "http://localhost:8080/api/collections/books/documents" \
 ### Search
 - `POST /collections/search?collection=NAME&query=TEXT` - simple search
 - `POST /query` - SQL-like query; body `{"query":"..." }`
+
+Notes:
+- `SELECT * FROM collection` returns all documents up to 200 results.
+- All search responses are capped at 200 documents by default.
 
 Examples:
 ```bash
