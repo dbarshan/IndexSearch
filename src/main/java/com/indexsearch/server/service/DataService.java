@@ -98,6 +98,35 @@ public class DataService {
     }
 
     /**
+     * Load up to a limited number of documents for a collection.
+     */
+    public List<JsonNode> listAll(String collection, int limit) {
+        if (limit <= 0) {
+            return List.of();
+        }
+        Path dir = Paths.get(properties.getDataDir(), collection);
+        if (!storageManager.isDirectoryExists(dir.toString())) {
+            return List.of();
+        }
+        List<JsonNode> docs = new ArrayList<>();
+        try (var stream = java.nio.file.Files.walk(dir)) {
+            stream.filter(java.nio.file.Files::isRegularFile)
+                    .filter(path -> path.toString().endsWith(".json"))
+                    .limit(limit)
+                    .forEach(path -> {
+                        try {
+                            docs.add(objectMapper.readTree(path.toFile()));
+                        } catch (IOException e) {
+                            throw new RuntimeException("Failed to read document: " + path, e);
+                        }
+                    });
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to list documents for collection: " + collection, e);
+        }
+        return docs;
+    }
+
+    /**
      * Write a document JSON file to the collection directory.
      */
     private void writeDocument(String collection, String docId, JsonNode document) {
