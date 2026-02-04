@@ -14,7 +14,8 @@ import java.util.regex.Pattern;
 @Service
 public class QueryProcessor {
     private static final Pattern SIMPLE_SQL =
-            Pattern.compile("^select\\s+.+\\s+from\\s+(\\w+)(?:\\s+where\\s+(.+))?$", Pattern.CASE_INSENSITIVE);
+            Pattern.compile("^select\\s+(.+?)\\s+from\\s+(\\w+)(?:\\s+where\\s+(.+?))?(?:\\s+order\\s+by\\s+(\\w+)(?:\\s+(asc|desc))?)?(?:\\s+limit\\s+(\\d+))?$",
+                    Pattern.CASE_INSENSITIVE);
     private static final Pattern FIELD_EQUALS =
             Pattern.compile("^(\\w+)\\s*=\\s*(['\"]?)(.+?)\\2$", Pattern.CASE_INSENSITIVE);
 
@@ -40,10 +41,38 @@ public class QueryProcessor {
         if (!matcher.matches()) {
             throw new IllegalArgumentException("Invalid query syntax");
         }
-        String collection = matcher.group(1);
-        String where = matcher.group(2);
+        String selectText = matcher.group(1);
+        String collection = matcher.group(2);
+        String where = matcher.group(3);
+        String orderByField = matcher.group(4);
+        String orderDir = matcher.group(5);
+        String limitText = matcher.group(6);
         String queryText = where == null ? "" : where.trim();
         String fieldName = null;
+        Integer limit = null;
+        boolean orderDesc = false;
+        boolean selectAll = false;
+        java.util.List<String> selectFields = java.util.List.of();
+        String selectNormalized = selectText == null ? "" : selectText.trim();
+        if (selectNormalized.isEmpty()) {
+            throw new IllegalArgumentException("Select fields cannot be empty");
+        }
+        if ("*".equals(selectNormalized)) {
+            selectAll = true;
+        } else {
+            String[] parts = selectNormalized.split(",");
+            java.util.List<String> fields = new java.util.ArrayList<>();
+            for (String part : parts) {
+                String field = part.trim();
+                if (!field.isEmpty()) {
+                    fields.add(field);
+                }
+            }
+            if (fields.isEmpty()) {
+                throw new IllegalArgumentException("Select fields cannot be empty");
+            }
+            selectFields = java.util.List.copyOf(fields);
+        }
         if (!queryText.isEmpty()) {
             Matcher fieldMatcher = FIELD_EQUALS.matcher(queryText);
             if (fieldMatcher.matches()) {
@@ -51,6 +80,22 @@ public class QueryProcessor {
                 queryText = fieldMatcher.group(3);
             }
         }
-        return new QuerySpec(collection, queryText, fieldName);
+        if (orderByField != null && orderByField.isBlank()) {
+            throw new IllegalArgumentException("Order by field cannot be empty");
+        }
+        if (orderDir != null) {
+            orderDesc = "desc".equalsIgnoreCase(orderDir.trim());
+        }
+        if (limitText != null) {
+            try {
+                limit = Integer.parseInt(limitText);
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Invalid limit value");
+            }
+            if (limit <= 0) {
+                throw new IllegalArgumentException("Limit must be greater than zero");
+            }
+        }
+        return new QuerySpec(collection, queryText, fieldName, limit, orderByField, orderDesc, selectAll, selectFields);
     }
 }
