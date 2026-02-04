@@ -134,3 +134,8 @@ curl -X POST "http://localhost:8080/api/query" \
   -H "Content-Type: application/json" \
   -d '{"query":"SELECT * FROM books WHERE content = \"hello\""}'
 ```
+
+## Contact
+
+- Barshan Das
+- dbarshan1989@gmail.com
