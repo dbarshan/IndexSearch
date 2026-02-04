@@ -5,6 +5,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
+import javafx.scene.image.Image;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.core.io.support.ResourcePropertySource;
 import com.indexsearch.client.config.RestClientConfig;
@@ -28,6 +29,7 @@ public class GuiLauncher extends Application {
         GuiController controller = loader.getController();
         Scene scene = new Scene(root);
         stage.setTitle("IndexSearch");
+        stage.getIcons().add(new Image(GuiLauncher.class.getResourceAsStream("/client/gui/icon.png")));
         stage.setScene(scene);
         stage.setOnCloseRequest(event -> {
             if (controller != null) {
