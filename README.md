@@ -29,7 +29,7 @@ This produces:
 The server starts on `http://localhost:8080` by default.
 
 ```bash
-./server.sh
+./script/server.sh
 ```
 
 Or run the JAR directly:
@@ -42,11 +42,8 @@ Server data is stored under `data/`, `metadata/`, and `index/` in the project ro
 
 ## Run the Client (CLI)
 
-The CLI talks to the server at `http://localhost:8080` by default. Override with
-`-Dindexsearch.server.url=...` if needed.
-
 ```bash
-./client.sh
+./script/client-cli.sh
 ```
 
 Or run the JAR directly:
@@ -78,6 +75,11 @@ The GUI uses JavaFX 21 and reads the same server URL setting. It does not
 connect automatically; click **connect** to load collections.
 
 ```bash
+./script/client-gui.sh
+```
+Or run the JAR directly:
+
+```bash
 java -Dspring.profiles.active=client \
   -Dapplication.client.mode=gui \
   -Dindexsearch.server.url=http://localhost:8080 \
@@ -85,6 +87,8 @@ java -Dspring.profiles.active=client \
 ```
 
 ![IndexSearch GUI](docs/images/gui.png)
+
+The client talks to the server at `http://localhost:8080` by default. Override with `-Dindexsearch.server.url=...` if needed.
 
 ## APIs
 
