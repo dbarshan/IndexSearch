@@ -53,6 +53,8 @@ java -Dspring.profiles.active=client \
   -Dapplication.client.mode=cli \
   -jar target/indexsearch-client-0.0.1-SNAPSHOT.jar
 ```
+Note: The client talks to the server at `http://localhost:8080` by default. 
+Override with `-Dindexsearch.server.url=...` if needed.
 
 CLI commands:
 ```
@@ -83,11 +85,10 @@ java -Dspring.profiles.active=client \
   -Dapplication.client.mode=gui \
   -jar target/indexsearch-client-0.0.1-SNAPSHOT.jar
 ```
+Note: The client talks to the server at `http://localhost:8080` by default. 
+Override with `-Dindexsearch.server.url=...` if needed.
 
 ![IndexSearch GUI](docs/images/gui.png)
-
-The client talks to the server at `http://localhost:8080` by default. 
-Override with `-Dindexsearch.server.url=...` if needed.
 
 ## APIs
 
