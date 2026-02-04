@@ -30,6 +30,9 @@ public class QueryProcessor {
                 || (normalized.startsWith("'") && normalized.endsWith("'"))) {
             normalized = normalized.substring(1, normalized.length() - 1).trim();
         }
+        if (normalized.endsWith(";")) {
+            normalized = normalized.substring(0, normalized.length() - 1).trim();
+        }
         if (!normalized.toLowerCase(Locale.ROOT).startsWith("select")) {
             return null;
         }

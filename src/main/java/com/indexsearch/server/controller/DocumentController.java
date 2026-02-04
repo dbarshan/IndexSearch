@@ -31,7 +31,10 @@ public class DocumentController {
      * Create a new document in the collection.
      */
     @PostMapping
-    public ResponseEntity<JsonNode> create(@PathVariable String collection, @RequestBody JsonNode document) {
+    public ResponseEntity<?> create(@PathVariable String collection, @RequestBody JsonNode document) {
+        if (document != null && document.isArray()) {
+            return ResponseEntity.ok(processor.createDocuments(collection, document));
+        }
         return ResponseEntity.ok(processor.createDocument(collection, document));
     }
 
