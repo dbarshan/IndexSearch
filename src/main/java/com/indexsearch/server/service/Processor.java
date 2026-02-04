@@ -6,12 +6,16 @@ import com.indexsearch.server.exception.CollectionNotFoundException;
 import com.indexsearch.server.model.QuerySpec;
 import com.indexsearch.server.query.QueryProcessor;
 import com.indexsearch.server.util.LoggerUtil;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.NullNode;
 
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Comparator;
 import java.util.Set;
+import java.util.ArrayList;
 
 /**
  * Orchestrates document persistence, indexing, and query handling.
@@ -104,15 +108,39 @@ public class Processor {
             throw new IllegalArgumentException("Expected a SQL query");
         }
         validateCollection(spec.getCollectionName());
+        int limit = spec.getLimit() == null ? MAX_RESULTS : Math.min(spec.getLimit(), MAX_RESULTS);
+        if (limit <= 0) {
+            return List.of();
+        }
+        boolean hasOrder = spec.getOrderByField() != null && !spec.getOrderByField().isBlank();
         if (spec.getQueryText() == null || spec.getQueryText().isBlank()) {
-            return dataService.listAll(spec.getCollectionName(), MAX_RESULTS);
+            List<JsonNode> results = dataService.listAll(
+                    spec.getCollectionName(),
+                    hasOrder ? MAX_RESULTS : limit
+            );
+            if (hasOrder) {
+                sortResults(results, spec.getOrderByField(), spec.isOrderDesc());
+                results = applyLimit(results, limit);
+                return applyProjection(results, spec);
+            }
+            return applyProjection(results, spec);
         }
         Set<String> docIds = indexService.search(
                 spec.getCollectionName(),
                 spec.getQueryText(),
                 spec.getFieldName()
         );
-        return resolveDocuments(spec.getCollectionName(), docIds, MAX_RESULTS);
+        List<JsonNode> results = resolveDocuments(
+                spec.getCollectionName(),
+                docIds,
+                hasOrder ? MAX_RESULTS : limit
+        );
+        if (hasOrder) {
+            sortResults(results, spec.getOrderByField(), spec.isOrderDesc());
+            results = applyLimit(results, limit);
+            return applyProjection(results, spec);
+        }
+        return applyProjection(results, spec);
     }
 
     public void rebuildIndex(String collection) {
@@ -150,5 +178,58 @@ public class Processor {
             }
         }
         return results;
+    }
+
+    private void sortResults(List<JsonNode> results, String orderByField, boolean desc) {
+        if (results == null || results.size() < 2) {
+            return;
+        }
+        Comparator<JsonNode> comparator = (left, right) -> compareOrderValues(
+                left == null ? null : left.get(orderByField),
+                right == null ? null : right.get(orderByField)
+        );
+        if (desc) {
+            comparator = comparator.reversed();
+        }
+        results.sort(comparator);
+    }
+
+    private int compareOrderValues(JsonNode left, JsonNode right) {
+        if (left == null || left.isNull()) {
+            return right == null || right.isNull() ? 0 : 1;
+        }
+        if (right == null || right.isNull()) {
+            return -1;
+        }
+        if (left.isNumber() && right.isNumber()) {
+            return left.decimalValue().compareTo(right.decimalValue());
+        }
+        if (left.isBoolean() && right.isBoolean()) {
+            return Boolean.compare(left.asBoolean(), right.asBoolean());
+        }
+        return left.asText().compareToIgnoreCase(right.asText());
+    }
+
+    private List<JsonNode> applyLimit(List<JsonNode> results, int limit) {
+        if (results == null || results.isEmpty() || limit >= results.size()) {
+            return results == null ? List.of() : results;
+        }
+        return new ArrayList<>(results.subList(0, limit));
+    }
+
+    private List<JsonNode> applyProjection(List<JsonNode> results, QuerySpec spec) {
+        if (spec.isSelectAll() || results == null || results.isEmpty()) {
+            return results == null ? List.of() : results;
+        }
+        List<JsonNode> projected = new ArrayList<>(results.size());
+        for (JsonNode doc : results) {
+            ObjectNode node = JsonNodeFactory.instance.objectNode();
+            for (String field : spec.getSelectFields()) {
+                JsonNode value = doc == null ? null : doc.get(field);
+                node.set(field, value == null ? NullNode.instance : value);
+            }
+            projected.add(node);
+        }
+        return projected;
     }
 }

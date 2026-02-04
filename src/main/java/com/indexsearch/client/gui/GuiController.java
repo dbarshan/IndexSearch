@@ -11,7 +11,11 @@ import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.Label;
-import javafx.scene.text.TextFlow;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.MenuItem;
+import org.fxmisc.richtext.InlineCssTextArea;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -22,8 +26,16 @@ import java.util.concurrent.Executors;
 @Component
 public class GuiController {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final String COLOR_KEY = "#000000";
+    private static final String COLOR_STRING = "#556b2f";
+    private static final String COLOR_NUMBER = "#d16969";
+    private static final String COLOR_BOOLEAN = "#d7ba7d";
+    private static final String COLOR_NULL = "#808080";
+    private static final String COLOR_PUNCT = "#d4d4d4";
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final ClientService clientService;
+    private final ContextMenu resultMenu = new ContextMenu();
+    private final Image collectionIcon = loadIcon("/client/gui/collection.png");
 
     @Value("${indexsearch.server.url:http://localhost:8080}")
     private String serverBaseUrl;
@@ -41,7 +53,7 @@ public class GuiController {
     private TextArea txtQueryBox;
 
     @FXML
-    private TextFlow txtResultBox;
+    private InlineCssTextArea txtResultBox;
 
     @FXML
     public void initialize() {
@@ -52,11 +64,22 @@ public class GuiController {
                 super.updateItem(item, empty);
                 if (empty || item == null) {
                     setText(null);
+                    setGraphic(null);
                     return;
+                }
+                if (collectionIcon != null) {
+                    ImageView iconView = new ImageView(collectionIcon);
+                    iconView.setFitWidth(14);
+                    iconView.setFitHeight(14);
+                    iconView.setPreserveRatio(true);
+                    setGraphic(iconView);
+                } else {
+                    setGraphic(null);
                 }
                 setText(item.getName());
             }
         });
+        setupResultMenu();
     }
 
     public GuiController(ClientService clientService) {
@@ -149,7 +172,109 @@ public class GuiController {
     }
 
     private void setResult(String message) {
-        txtResultBox.getChildren().setAll(new javafx.scene.text.Text(message));
+        if (txtResultBox == null) {
+            return;
+        }
+        txtResultBox.replaceText("");
+        if (message == null || message.isBlank()) {
+            return;
+        }
+        String trimmed = message.trim();
+        if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
+            appendStyled(message, COLOR_PUNCT);
+            return;
+        }
+        try {
+            JsonNode node = OBJECT_MAPPER.readTree(message);
+            appendJson(node, 0);
+        } catch (Exception e) {
+            appendStyled(message, COLOR_PUNCT);
+        }
+    }
+
+    private void appendJson(JsonNode node, int indent) {
+        if (node == null || node.isNull()) {
+            appendStyled("null", COLOR_NULL);
+            return;
+        }
+        if (node.isObject()) {
+            appendStyled("{\n", COLOR_PUNCT);
+            int size = node.size();
+            int index = 0;
+            for (var it = node.fields(); it.hasNext(); ) {
+                var entry = it.next();
+                appendIndent(indent + 2);
+                appendStyled("\"" + entry.getKey() + "\"", COLOR_KEY);
+                appendStyled(": ", COLOR_PUNCT);
+                appendJson(entry.getValue(), indent + 2);
+                if (index < size - 1) {
+                    appendStyled(",", COLOR_PUNCT);
+                }
+                appendStyled("\n", COLOR_PUNCT);
+                index++;
+            }
+            appendIndent(indent);
+            appendStyled("}", COLOR_PUNCT);
+            return;
+        }
+        if (node.isArray()) {
+            appendStyled("[\n", COLOR_PUNCT);
+            int size = node.size();
+            for (int i = 0; i < size; i++) {
+                appendIndent(indent + 2);
+                appendJson(node.get(i), indent + 2);
+                if (i < size - 1) {
+                    appendStyled(",", COLOR_PUNCT);
+                }
+                appendStyled("\n", COLOR_PUNCT);
+            }
+            appendIndent(indent);
+            appendStyled("]", COLOR_PUNCT);
+            return;
+        }
+        if (node.isTextual()) {
+            appendStyled("\"" + node.asText() + "\"", COLOR_STRING);
+        } else if (node.isNumber()) {
+            appendStyled(node.numberValue().toString(), COLOR_NUMBER);
+        } else if (node.isBoolean()) {
+            appendStyled(Boolean.toString(node.asBoolean()), COLOR_BOOLEAN);
+        } else {
+            appendStyled(node.asText(), COLOR_STRING);
+        }
+    }
+
+    private void appendIndent(int spaces) {
+        if (spaces <= 0) {
+            return;
+        }
+        appendStyled(" ".repeat(spaces), COLOR_PUNCT);
+    }
+
+    private void appendStyled(String value, String color) {
+        if (value == null || value.isEmpty()) {
+            return;
+        }
+        int start = txtResultBox.getLength();
+        txtResultBox.appendText(value);
+        txtResultBox.setStyle(start, start + value.length(), "-fx-fill: " + color + ";");
+    }
+
+    private Image loadIcon(String path) {
+        try {
+            return new Image(GuiController.class.getResourceAsStream(path));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private void setupResultMenu() {
+        if (txtResultBox == null) {
+            return;
+        }
+        MenuItem copy = new MenuItem("Copy");
+        copy.setOnAction(event -> txtResultBox.copy());
+        resultMenu.getItems().setAll(copy);
+        txtResultBox.setContextMenu(resultMenu);
     }
 
     public void shutdown() {
