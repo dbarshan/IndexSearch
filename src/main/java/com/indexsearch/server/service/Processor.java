@@ -2,6 +2,7 @@ package com.indexsearch.server.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.indexsearch.server.index.IndexService;
+import com.indexsearch.server.exception.CollectionNotFoundException;
 import com.indexsearch.server.model.QuerySpec;
 import com.indexsearch.server.query.QueryProcessor;
 import com.indexsearch.server.util.LoggerUtil;
@@ -125,7 +126,7 @@ public class Processor {
      */
     private void validateCollection(String collection) {
         if (metadataService.getMapping(collection) == null) {
-            throw new IllegalArgumentException("Collection not found: " + collection);
+            throw new CollectionNotFoundException("Collection not found: " + collection);
         }
     }
 
